@@ -95,26 +95,35 @@ Vector Plane::getNormal(Vector point)
 bool Sphere::intercepts(Ray& r, float& t )
 {
 	float a = (r.direction.x * r.direction.x) + (r.direction.y * r.direction.y) + (r.direction.z * r.direction.z);
-	float b = r.direction.x * (center.x - r.origin.x) + r.direction.y * (center.y - r.origin.y) + r.direction.z * (center.z - r.origin.z);
-	float c = ((center.x - r.origin.x) * (center.x - r.origin.x)) + ((center.y - r.origin.y) * (center.y - r.origin.y)) + ((center.z - r.origin.z) * (center.z - r.origin.z)) - (radius * radius);
+	float b = (center - r.origin) * r.direction;
+	//float b = r.direction.x * (center.x - r.origin.x) + r.direction.y * (center.y - r.origin.y) + r.direction.z * (center.z - r.origin.z);
+	float c = (center - r.origin) * (center - r.origin) - SqRadius;
+	//float c = ((center.x - r.origin.x) * (center.x - r.origin.x)) + ((center.y - r.origin.y) * (center.y - r.origin.y)) + ((center.z - r.origin.z) * (center.z - r.origin.z)) - SqRadius;
+	//std::cout << "b = " << b << std::endl << std::endl;
+	//std::cout << "c = " << c << std::endl;
 	
-	if (b * b - c <= 0)
-	{
-		return false;
-	}
 
 	if (c > 0)
 	{
 		if (b <= 0)
 		{
+			//std::cout << "no ingtercept sphere2" << std::endl;
 			return false;
 		}
 
+		if (b * b - c <= 0)
+		{
+			//std::cout << "no ingtercept sphere1" << std::endl;
+			return false;
+		}
+
+		std::cout << "ingtercept sphere1" << std::endl;
 		t = b - sqrt(b * b - c);
 		return true;
 	}
 	else
 	{
+		std::cout << "ingtercept sphere2" << std::endl;
 		t = b + sqrt(b * b - c);
 		return true;
 	}

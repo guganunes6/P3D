@@ -82,27 +82,66 @@ int WindowHandle = 0;
 Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of medium 1 where the ray is travelling
 {
 	float t;
-	float closest = INFINITY;
+	float closestT = INFINITY;
+	Object* closestObject = NULL;
+	Color color;
 
 	for (int i = 0; i < scene->getNumObjects(); i++)
 	{
 		Object* object = scene->getObject(i);
-
+		
 		if (object->intercepts(ray, t))
 		{
-			if (t < closest)
+			//std::cout << "ingtercept" << std::endl;
+			if (t < closestT)
 			{
-				closest = t;
+				closestObject = object;
+				closestT = t;
 			}
 		}
 	}
 
-	if (closest == INFINITY) {
+	if (closestT == INFINITY) 
+	{
 		return scene->GetBackgroundColor();
 	}
 
+	else 
+	{
+		Vector hitPoint = ray.origin + ray.direction * closestT;
+		Vector normal = closestObject->getNormal(hitPoint);
 
-	return Color(0.0f, 0.0f, 0.0f);
+		for (int i = 0; i < scene->getNumLights(); i++)
+		{
+			Light* light = scene->getLight(i);
+			Vector L = light->position - hitPoint;
+			L.normalize();
+
+			if (L * normal > 0) 
+			{
+				Ray shadowRay = Ray(hitPoint, L);
+
+				for (int i = 0; i < scene->getNumObjects(); i++)
+				{
+					Object* object = scene->getObject(i);
+
+					if (!object->intercepts(shadowRay, t))
+					{
+						Vector V = ray.origin - hitPoint;
+						Vector H = (L + V) / 2;
+						Color colorDiff = light->color * object->GetMaterial()->GetDiffColor() * (normal * L);
+						Color colorSpec = light->color * object->GetMaterial()->GetSpecColor() * pow((H * normal), object->GetMaterial()->GetShine());
+						color = colorDiff + colorSpec;
+					}
+				}
+			}
+		}
+
+		if (depth >= MAX_DEPTH) return color;
+	}
+
+
+	return color;
 }
 
 /////////////////////////////////////////////////////////////////////// ERRORS
@@ -319,7 +358,7 @@ void renderScene()
 			color = rayTracing(ray, 1, 1.0).clamp();
 			
 
-			color = scene->GetBackgroundColor(); //TO CHANGE - just for the template
+			//color = scene->GetBackgroundColor(); //TO CHANGE - just for the template
 
 			img_Data[counter++] = u8fromfloat((float)color.r());
 			img_Data[counter++] = u8fromfloat((float)color.g());
