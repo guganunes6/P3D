@@ -117,13 +117,13 @@ bool Sphere::intercepts(Ray& r, float& t )
 			return false;
 		}
 
-		std::cout << "ingtercept sphere1" << std::endl;
+		//std::cout << "ingtercept sphere1" << std::endl;
 		t = b - sqrt(b * b - c);
 		return true;
 	}
 	else
 	{
-		std::cout << "ingtercept sphere2" << std::endl;
+		//std::cout << "ingtercept sphere2" << std::endl;
 		t = b + sqrt(b * b - c);
 		return true;
 	}
