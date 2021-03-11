@@ -110,6 +110,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	{
 		Vector hitPoint = ray.origin + ray.direction * closestT;
 		Vector normal = closestObject->getNormal(hitPoint);
+		normal.normalize();
 
 		for (int i = 0; i < scene->getNumLights(); i++)
 		{
@@ -129,9 +130,9 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					{
 						Vector V = ray.origin - hitPoint;
 						Vector H = (L + V) / 2;
-						Color colorDiff = light->color * object->GetMaterial()->GetDiffColor() * (normal * L);
+						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
 						Color colorSpec = light->color * object->GetMaterial()->GetSpecColor() * pow((H * normal), object->GetMaterial()->GetShine());
-						color = colorDiff + colorSpec;
+						color = colorDiff;// +colorSpec;
 					}
 				}
 			}
