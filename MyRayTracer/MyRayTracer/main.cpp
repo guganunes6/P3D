@@ -110,7 +110,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	{
 		Vector hitPoint = ray.origin + ray.direction * closestT;
 		Vector normal = closestObject->getNormal(hitPoint);
-		normal.normalize();
+
+		hitPoint = hitPoint + normal * 0.0001; // this is the bias because of the acne thingy;
 
 		for (int i = 0; i < scene->getNumLights(); i++)
 		{
@@ -121,19 +122,30 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 			if (L * normal > 0) 
 			{
 				Ray shadowRay = Ray(hitPoint, L);
+				bool in_shadow = false;
 
 				for (int i = 0; i < scene->getNumObjects(); i++)
 				{
 					Object* object = scene->getObject(i);
 
-					if (!object->intercepts(shadowRay, t))
+					if (!object->intercepts(shadowRay, t)) continue;
+					
+					else
 					{
-						Vector V = ray.origin - hitPoint;
-						Vector H = (L + V) / 2;
-						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
-						Color colorSpec = light->color * object->GetMaterial()->GetSpecColor() * pow((H * normal), object->GetMaterial()->GetShine());
-						color = colorDiff;// +colorSpec;
+						in_shadow = true;
+						break;
 					}
+				}
+
+				if (!in_shadow) 
+				{
+					Vector V = ray.origin - hitPoint;
+					V.normalize();
+					Vector H = (L + V) / 2;
+					H.normalize();
+					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
+					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecColor() * pow((H * normal), closestObject->GetMaterial()->GetShine());
+					color += colorDiff + colorSpec;
 				}
 			}
 		}
