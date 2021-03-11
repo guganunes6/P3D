@@ -143,8 +143,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					V.normalize();
 					Vector H = (L + V) / 2;
 					H.normalize();
-					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
-					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecColor() * pow((H * normal), closestObject->GetMaterial()->GetShine());
+					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
+					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow((H * normal), closestObject->GetMaterial()->GetShine());
 					color += colorDiff + colorSpec;
 				}
 			}
