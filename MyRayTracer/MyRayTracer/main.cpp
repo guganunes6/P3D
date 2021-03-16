@@ -111,6 +111,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		Vector hitPoint = ray.origin + ray.direction * closestT;
 		Vector normal = closestObject->getNormal(hitPoint);
 
+		if (ray.direction * normal > 0) normal = normal * -1;
+
 		hitPoint = hitPoint + normal * 0.0001; // this is the bias because of the acne thingy;
 
 		Vector V = ray.origin - hitPoint;
@@ -144,8 +146,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 				{
 					Vector H = (L + V) / 2;
 					H.normalize();
-					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * (normal * L);
-					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow((H * normal), closestObject->GetMaterial()->GetShine());
+					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
 					color += colorDiff + colorSpec;
 				}
 			}
@@ -153,20 +155,26 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 		if (depth >= MAX_DEPTH) return color;
 
+		Vector VT = normal * (V * normal) - V;
+		float senI = VT.length();
+		float cosI = sqrt(1 - senI * senI);
+
+		float fresnelReflectance = pow((ior_1 - closestObject->GetMaterial()->GetRefrIndex()) / (ior_1 + closestObject->GetMaterial()->GetRefrIndex()), 2);
+		float Kr = fresnelReflectance + (1.0f - fresnelReflectance) * pow(1 - cosI, 5);
 		
 		if (closestObject->GetMaterial()->GetTransmittance() > 0)
 		{
 			Vector reflectedRayDirection = normal * (V * normal) * 2 - V;
 			Ray reflectedRay = Ray(hitPoint, reflectedRayDirection);
 			Color rColor = rayTracing(reflectedRay, depth + 1, ior_1);
-			color += rColor * closestObject->GetMaterial()->GetSpecular();
+			color += rColor * closestObject->GetMaterial()->GetSpecular();// *Kr;
 		}
 		
 
-		/*
+		
 		if (closestObject->GetMaterial()->GetTransmittance() > 0)
 		{
-			Vector VT = normal * (V * normal) - V;
+			
 			float senoT = ior_1 / closestObject->GetMaterial()->GetRefrIndex() * VT.length();
 
 			Vector T = VT / VT.length();
@@ -176,9 +184,9 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 			Vector refractedRayDirection = T * senoT + normal * -cosT;
 			Ray refractedRay = Ray(hitPoint, refractedRayDirection);
 			Color tColor = rayTracing(refractedRay, depth + 1, ior_1);
-			color += tColor * closestObject->GetMaterial()->GetTransmittance();
+			color += tColor * closestObject->GetMaterial()->GetTransmittance();// *(1 - Kr);
 		}
-		*/
+		
 	}
 
 
