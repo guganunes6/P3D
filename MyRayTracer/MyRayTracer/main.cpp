@@ -31,6 +31,7 @@
 #define COLOR_ATTRIB 1
 
 #define MAX_DEPTH 4
+#define SHADOW_BIAS 0.0001
 
 unsigned int FrameCount = 0;
 
@@ -52,7 +53,7 @@ long myTime, timebase = 0, frame = 0;
 char s[32];
 
 //Enable OpenGL drawing.  
-bool drawModeEnabled = true;
+bool drawModeEnabled = false;
 
 bool P3F_scene = true; //choose between P3F scene or a built-in random scene
 
@@ -92,7 +93,6 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		
 		if (object->intercepts(ray, t))
 		{
-			//std::cout << "ingtercept" << std::endl;
 			if (t < closestT)
 			{
 				closestObject = object;
@@ -113,7 +113,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 		if (ray.direction * normal > 0) normal = normal * -1;
 
-		Vector shadowHitPoint = hitPoint + normal * 0.0001; // this is the bias because of the acne thingy; only use this to calculate the shadows
+		Vector shadowHitPoint = hitPoint + normal * SHADOW_BIAS; // this is the bias because of the acne thingy; only use this to calculate the shadows
 
 		for (int i = 0; i < scene->getNumLights(); i++)
 		{
@@ -173,7 +173,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 			//check if the object is metallic
 			if (closestObject->GetMaterial()->GetTransmittance() == 0)
-				color += rColor * closestObject->GetMaterial()->GetSpecular();
+				color += rColor * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor();
 
 			//else it is transparent 
 			else
@@ -203,7 +203,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					float cosT = sqrt(1 - senoT * senoT);
 
 					Vector refractedRayDirection = T * senoT + normal * -cosT;
-					Ray refractedRay = Ray(hitPoint - normal * 0.0001, refractedRayDirection); // here the hitPoint is never outside the object
+					Ray refractedRay = Ray(hitPoint - normal * SHADOW_BIAS, refractedRayDirection); // here the hitPoint is never outside the object
 					Color tColor = rayTracing(refractedRay, depth + 1, ior_2);
 
 					color += rColor * Kr + tColor * (1 - Kr);

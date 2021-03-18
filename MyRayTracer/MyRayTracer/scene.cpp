@@ -13,6 +13,9 @@ Triangle::Triangle(Vector& P0, Vector& P1, Vector& P2)
 
 	/* Calculate the normal */
 	normal = Vector(0, 0, 0);
+	Vector edge0 = P1 - P0;
+	Vector edge1 = P2 - P0;
+	normal = edge0 % edge1;
 	normal.normalize();
 
 	//Calculate the Min and Max for bounding box
@@ -39,8 +42,40 @@ Vector Triangle::getNormal(Vector point)
 //
 
 bool Triangle::intercepts(Ray& r, float& t ) {
+	float a = points[1].x - points[0].x;
+	float b = points[2].x - points[0].x;
+	float c = -r.direction.x;
 
-	return (false);
+	float d = r.origin.x - points[0].x;
+
+	float e = points[1].y - points[0].y;
+	float f = points[2].y - points[0].y;
+	float g = -r.direction.y;
+
+	float h = r.origin.y - points[0].y;
+
+	float i = points[1].z - points[0].z;
+	float j = points[2].z - points[0].z;
+	float k = -r.direction.z;
+
+	float l = r.origin.z - points[0].z;
+
+	float B = (d * (f * k - g * j) + b * (g * l - h * k) + c * (h * j - f * l)) / 
+			  (a * (f * k - g * j) + b * (g * i - e * k) + c * (e * j - f * i));
+
+	float Y = (a * (h * k - g * l) + d * (g * i - e * k) + c * (e * l - h * i)) /
+		      (a * (f * k - g * j) + b * (g * i - e * k) + c * (e * j - f * i));
+
+	if (0 <= B && B <= 1 && 0 <= Y && Y <= 1 && 0 <= B + Y && B + Y <= 1)
+	{
+		t = (a * (f * l - h * j) + b * (h * i - e * l) + d * (e * j - f * i)) /
+			(a * (f * k - g * j) + b * (g * i - e * k) + c * (e * j - f * i));
+
+		if (t < 0) return false;
+		else return true;
+	}
+
+	else return false;
 }
 
 Plane::Plane(Vector& a_PN, float a_D)
@@ -146,7 +181,112 @@ AABB aaBox::GetBoundingBox() {
 
 bool aaBox::intercepts(Ray& ray, float& t)
 {
-		return (false);
+	Vector o = ray.origin;
+	Vector d = ray.direction;
+
+	Vector t_min;
+	Vector t_max;
+
+	//calculate intersection
+	double a = 1.0f / d.x;
+	if (a >= 0)
+	{
+		t_min.x = (min.x - o.x) * a;
+		t_max.x = (max.x - o.x) * a;
+	}
+	else
+	{
+		t_min.x = (max.x - o.x) * a;
+		t_max.x = (min.x - o.x) * a;
+	}
+
+	double b = 1.0f / d.y;
+	if (b >= 0)
+	{
+		t_min.y = (min.y - o.y) * b;
+		t_max.y = (max.y - o.y) * b;
+	}
+	else
+	{
+		t_min.y = (max.y - o.y) * b;
+		t_max.y = (min.y - o.y) * b;
+	}
+
+	double c = 1.0f / d.z;
+	if (c >= 0)
+	{
+		t_min.z = (min.z - o.z) * c;
+		t_max.z = (max.z - o.z) * c;
+	}
+	else
+	{
+		t_min.z = (max.z - o.z) * c;
+		t_max.z = (min.z - o.z) * c;
+	}
+
+	float tE;
+	float tL;
+	Vector face_in;
+	Vector face_out;
+
+	//find largest tE, entering tValue
+
+	if (t_min.x > t_min.y)
+	{
+		tE = t_min.x;
+		face_in = (a >= 0) ? Vector(-1, 0, 0) : Vector(1, 0, 0);
+	}
+
+	else
+	{
+		tE = t_min.y;
+		face_in = (b >= 0) ? Vector(0, -1, 0) : Vector(0, 1, 0);
+	}
+
+	if (t_min.z > tE)
+	{
+		tE = t_min.z;
+		face_in = (c >= 0) ? Vector(0, 0, -1) : Vector(0, 0, 1);
+	}
+
+	//find smallest tL, leaving tValue
+
+	if (t_max.x < t_max.y)
+	{
+		tL = t_max.x;
+		face_out = (a >= 0) ? Vector(1, 0, 0) : Vector(-1, 0, 0);
+	}
+
+	else
+	{
+		tL = t_max.y;
+		face_out = (b >= 0) ? Vector(0, 1, 0) : Vector(0, -1, 0);
+	}
+
+	if (t_max.z < tL)
+	{
+		tL = t_max.z;
+		face_out = (c >= 0) ? Vector(0, 0, 1) : Vector(0, 0, -1);
+	}
+
+	//condition for a hit
+
+	if (tE < tL && tL > 0)
+	{
+		if (tE > 0)
+		{
+			t = tE; // ray hits outside surface
+			Normal = face_in;
+		}
+
+		else
+		{
+			t = tL; //ray hits inside surface;
+			Normal = face_out;
+		}
+		return true;
+	}
+	else return false;
 }
 
 Vector aaBox::getNormal(Vector point)
