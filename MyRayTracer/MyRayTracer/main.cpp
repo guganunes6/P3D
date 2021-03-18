@@ -112,22 +112,18 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		Vector normal = closestObject->getNormal(hitPoint);
 
 		if (ray.direction * normal > 0) normal = normal * -1;
-		//if (ior_1 != 1) normal = normal * -1;
 
-		hitPoint = hitPoint + normal * 0.0001; // this is the bias because of the acne thingy;
-
-		Vector V = ray.origin - hitPoint;
-		V.normalize();
+		Vector shadowHitPoint = hitPoint + normal * 0.0001; // this is the bias because of the acne thingy; only use this to calculate the shadows
 
 		for (int i = 0; i < scene->getNumLights(); i++)
 		{
 			Light* light = scene->getLight(i);
-			Vector L = light->position - hitPoint;
+			Vector L = light->position - shadowHitPoint;
 			L.normalize();
 
 			if (L * normal > 0) 
 			{
-				Ray shadowRay = Ray(hitPoint, L);
+				Ray shadowRay = Ray(shadowHitPoint, L);
 				bool in_shadow = false;
 
 				for (int i = 0; i < scene->getNumObjects(); i++)
@@ -145,6 +141,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 				if (!in_shadow) 
 				{
+					Vector V = ray.origin - shadowHitPoint;
+					V.normalize();
 					Vector H = (L + V) / 2;
 					H.normalize();
 					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
@@ -160,49 +158,58 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		
 		if (closestObject->GetMaterial()->GetSpecular() > 0)
 		{
+			//index of refraction
 			float ior_2;
-
 			if (ior_1 != 1) ior_2 = 1;
 			else ior_2 = closestObject->GetMaterial()->GetRefrIndex();
 
+			//reflection calculation
+			Vector V = ray.origin - hitPoint;
+			V.normalize();
+
 			Vector reflectedRayDirection = normal * (V * normal) * 2 - V;
-			Ray reflectedRay = Ray(hitPoint, reflectedRayDirection);
+			Ray reflectedRay = Ray(shadowHitPoint, reflectedRayDirection); // shadowHitPoint is also used here so that the point is never inside the object
 			Color rColor = rayTracing(reflectedRay, depth + 1, ior_2);
 
+			//check if the object is metallic
 			if (closestObject->GetMaterial()->GetTransmittance() == 0)
 				color += rColor * closestObject->GetMaterial()->GetSpecular();
 
+			//else it is transparent 
 			else
 			{
 				float Kr;
 				Vector VT = normal * (V * normal) - V;
-				float senoT = ior_1 / closestObject->GetMaterial()->GetRefrIndex() * VT.length();
+				float senoT = (ior_1 / ior_2) * VT.length();
 				
-
-				if (senoT >= 1) Kr = 1;
+				//there is only reflection if senT is bigger that 1
+				if (senoT >= 1)
+				{
+					Kr = 1;
+					color += rColor * Kr;
+				}
 
 				else 
 				{
 					float senI = VT.length();
 					float cosI = sqrt(1 - senI * senI);
 					
+					//calculate the fresnel reflectance
+					float fresnelReflectance = (float) pow((ior_1 - ior_2) / (ior_1 + ior_2), 2);
+					Kr = fresnelReflectance + (1.0f - fresnelReflectance) * (float) pow(1 - cosI, 5);
 
-					float fresnelReflectance = pow((ior_1 - ior_2) / (ior_1 + ior_2), 2);
-					Kr = fresnelReflectance + (1.0f - fresnelReflectance) * pow(1 - cosI, 5);
+					//refraction calculation
+					Vector T = VT / VT.length();
+					float cosT = sqrt(1 - senoT * senoT);
+
+					Vector refractedRayDirection = T * senoT + normal * -cosT;
+					Ray refractedRay = Ray(hitPoint - normal * 0.0001, refractedRayDirection); // here the hitPoint is never outside the object
+					Color tColor = rayTracing(refractedRay, depth + 1, ior_2);
+
+					color += rColor * Kr + tColor * (1 - Kr);
 				}
-
-				Vector T = VT / VT.length();
-				float cosT = sqrt(1 - senoT * senoT);
-
-				Vector refractedRayDirection = T * senoT + normal * -cosT;
-				Ray refractedRay = Ray(hitPoint, refractedRayDirection);
-				Color tColor = rayTracing(refractedRay, depth + 1, ior_2);
-				color += rColor * Kr + tColor * (1 - Kr);
 			}
-			
-			
 		}
-		
 	}
 
 
