@@ -30,7 +30,7 @@
 #define VERTEX_COORD_ATTRIB 0
 #define COLOR_ATTRIB 1
 
-#define MAX_DEPTH 4
+#define MAX_DEPTH 5
 #define SHADOW_BIAS 0.0001
 
 unsigned int FrameCount = 0;
@@ -53,7 +53,7 @@ long myTime, timebase = 0, frame = 0;
 char s[32];
 
 //Enable OpenGL drawing.  
-bool drawModeEnabled = false;
+bool drawModeEnabled = true;
 
 bool P3F_scene = true; //choose between P3F scene or a built-in random scene
 
@@ -110,44 +110,51 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	{
 		Vector hitPoint = ray.origin + ray.direction * closestT;
 		Vector normal = closestObject->getNormal(hitPoint);
-
-		if (ray.direction * normal > 0) normal = normal * -1;
+		bool outside = true;
+		if (ray.direction * normal > 0)
+		{
+			normal = normal * -1;
+			outside = false;
+		}
 
 		Vector shadowHitPoint = hitPoint + normal * SHADOW_BIAS; // this is the bias because of the acne thingy; only use this to calculate the shadows
-
-		for (int i = 0; i < scene->getNumLights(); i++)
+		
+		if (outside)
 		{
-			Light* light = scene->getLight(i);
-			Vector L = light->position - shadowHitPoint;
-			L.normalize();
-
-			if (L * normal > 0) 
+			for (int i = 0; i < scene->getNumLights(); i++)
 			{
-				Ray shadowRay = Ray(shadowHitPoint, L);
-				bool in_shadow = false;
+				Light* light = scene->getLight(i);
+				Vector L = light->position - shadowHitPoint;
+				L.normalize();
 
-				for (int i = 0; i < scene->getNumObjects(); i++)
+				if (L * normal > 0) 
 				{
-					Object* object = scene->getObject(i);
+					Ray shadowRay = Ray(shadowHitPoint, L);
+					bool in_shadow = false;
 
-					if (!object->intercepts(shadowRay, t)) continue;
-					
-					else
+					for (int i = 0; i < scene->getNumObjects(); i++)
 					{
-						in_shadow = true;
-						break;
-					}
-				}
+						Object* object = scene->getObject(i);
 
-				if (!in_shadow) 
-				{
-					Vector V = ray.origin - shadowHitPoint;
-					V.normalize();
-					Vector H = (L + V) / 2;
-					H.normalize();
-					Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
-					Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-					color += colorDiff + colorSpec;
+						if (!object->intercepts(shadowRay, t)) continue;
+					
+						else
+						{
+							in_shadow = true;
+							break;
+						}
+					}
+
+					if (!in_shadow) 
+					{
+						Vector V = ray.origin - shadowHitPoint;
+						V.normalize();
+						Vector H = (L + V) / 2;
+						H.normalize();
+						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
+						color += colorDiff + colorSpec;
+					}
 				}
 			}
 		}
@@ -169,7 +176,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 			Vector reflectedRayDirection = normal * (V * normal) * 2 - V;
 			Ray reflectedRay = Ray(shadowHitPoint, reflectedRayDirection); // shadowHitPoint is also used here so that the point is never inside the object
-			Color rColor = rayTracing(reflectedRay, depth + 1, ior_2);
+			Color rColor = rayTracing(reflectedRay, depth + 1, ior_1);
 
 			//check if the object is metallic
 			if (closestObject->GetMaterial()->GetTransmittance() == 0)
@@ -183,7 +190,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 				float senoT = (ior_1 / ior_2) * VT.length();
 				
 				//there is only reflection if senT is bigger that 1
-				if (senoT >= 1)
+				if (senoT > 1)
 				{
 					Kr = 1;
 					color += rColor * Kr;
@@ -210,10 +217,11 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 				}
 			}
 		}
+		return color;
 	}
 
 
-	return color;
+	
 }
 
 /////////////////////////////////////////////////////////////////////// ERRORS
