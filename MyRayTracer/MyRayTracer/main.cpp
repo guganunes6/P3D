@@ -76,6 +76,10 @@ GLint UniformId;
 
 Scene* scene = NULL;
 int RES_X, RES_Y;
+float GRID_N = 4.0f;
+
+bool jittering = false;
+bool antiA = false;
 
 int WindowHandle = 0;
 
@@ -86,6 +90,9 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	float closestT = INFINITY;
 	Object* closestObject = NULL;
 	Color color;
+	float light_plane = 0.5f;
+	Vector a = Vector(light_plane, 0.0f, 0.0f);
+	Vector b = Vector(0.0f, 0.0f, light_plane);
 
 	for (int i = 0; i < scene->getNumObjects(); i++)
 	{
@@ -129,31 +136,44 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 				if (L * normal > 0) 
 				{
-					Ray shadowRay = Ray(shadowHitPoint, L);
+					Ray shadowRay = Ray(Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 0.0f));
 					bool in_shadow = false;
 
-					for (int i = 0; i < scene->getNumObjects(); i++)
+					if (antiA)
 					{
-						Object* object = scene->getObject(i);
+						Vector r = light->position + a * rand_float() + b * rand_float();
 
-						if (!object->intercepts(shadowRay, t)) continue;
-					
-						else
+						shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint).normalize());
+						in_shadow = false;
+
+						for (int i = 0; i < scene->getNumObjects(); i++)
 						{
-							in_shadow = true;
-							break;
+							Object* object = scene->getObject(i);
+
+							if (!object->intercepts(shadowRay, t)) continue;
+
+							else
+							{
+								in_shadow = true;
+								break;
+							}
+						}
+
+						if (!in_shadow)
+						{
+							Vector V = ray.origin - shadowHitPoint;
+							V.normalize();
+							Vector H = (L + V) / 2;
+							H.normalize();
+							Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+							Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
+							color += colorDiff + colorSpec;
 						}
 					}
-
-					if (!in_shadow) 
+					else
 					{
-						Vector V = ray.origin - shadowHitPoint;
-						V.normalize();
-						Vector H = (L + V) / 2;
-						H.normalize();
-						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
-						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-						color += colorDiff + colorSpec;
+						shadowRay = Ray(shadowHitPoint, L);
+
 					}
 				}
 			}
@@ -427,18 +447,44 @@ void renderScene()
 	{
 		for (int x = 0; x < RES_X; x++)
 		{
-			Color color; 
-
+			Color color = Color(0.0f, 0.0f, 0.0f);
 			Vector pixel;  //viewport coordinates
-			pixel.x = x + 0.5f;  
-			pixel.y = y + 0.5f;
 
-			//YOUR 2 FUNCTIONS:
-			Ray ray = scene->GetCamera()->PrimaryRay(pixel);
-			color = rayTracing(ray, 1, 1.0).clamp();
-			
+			if (!antiA)
+			{
+				pixel.x = x + 0.5f;
+				pixel.y = y + 0.5f;
 
-			//color = scene->GetBackgroundColor(); //TO CHANGE - just for the template
+				//YOUR 2 FUNCTIONS:
+				Ray ray = scene->GetCamera()->PrimaryRay(pixel);
+				color = rayTracing(ray, 1, 1.0).clamp();
+			}
+			else
+			{
+				for (int p = 0; p < GRID_N; p++)
+				{
+					for (int q = 0; q < GRID_N; q++)
+					{
+
+						if (!jittering)
+						{
+							pixel.x = x + (p + 0.5f) / GRID_N;
+							pixel.y = y + (q + 0.5f) / GRID_N;
+						}
+						else
+						{
+							pixel.x = x + (p + rand_float()) / GRID_N;
+							pixel.y = y + (q + rand_float()) / GRID_N;
+						}
+
+						//YOUR 2 FUNCTIONS:
+						Ray ray = scene->GetCamera()->PrimaryRay(pixel);
+						color += rayTracing(ray, 1, 1.0).clamp();
+					}
+				}
+
+				color = color * (1.0f / (GRID_N * GRID_N));
+			}
 
 			img_Data[counter++] = u8fromfloat((float)color.r());
 			img_Data[counter++] = u8fromfloat((float)color.g());
@@ -525,6 +571,14 @@ void processKeys(unsigned char key, int xx, int yy)
 		case 'c':
 			printf("Camera Spherical Coordinates (%f, %f, %f)\n", r, beta, alpha);
 			printf("Camera Cartesian Coordinates (%f, %f, %f)\n", camX, camY, camZ);
+			break;
+
+		case 'j':
+			jittering = !jittering;
+			break;
+
+		case 'a':
+			antiA = !antiA;
 			break;
 	}
 }
