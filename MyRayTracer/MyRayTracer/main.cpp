@@ -172,8 +172,36 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					}
 					else
 					{
-						shadowRay = Ray(shadowHitPoint, L);
+						int in_shadow_count = 0;
+						for (int p = 0; p < GRID_N; p++)
+						{
+							for (int q = 0; q < GRID_N; q++)
+							{
+								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / GRID_N), light->position.y, light->position.z + ((q + rand_float()) / GRID_N));
+								Vector L = lightPos - shadowHitPoint;
+								L.normalize();
+								shadowRay = Ray(shadowHitPoint, L);
+								for (int i = 0; i < scene->getNumObjects(); i++)
+								{
+									Object* object = scene->getObject(i);
 
+									if (!object->intercepts(shadowRay, t)) continue;
+									else
+									{
+										in_shadow_count++;
+										in_shadow = true;
+										break;
+									}
+								}
+							}
+						}
+						Vector V = ray.origin - shadowHitPoint;
+						V.normalize();
+						Vector H = (L + V) / 2;
+						H.normalize();
+						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
+						color += (colorDiff + colorSpec) * ((GRID_N * GRID_N - in_shadow_count) / (GRID_N * GRID_N));
 					}
 				}
 			}
