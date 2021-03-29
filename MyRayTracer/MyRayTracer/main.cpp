@@ -477,6 +477,7 @@ void renderScene()
 		{
 			Color color = Color(0.0f, 0.0f, 0.0f);
 			Vector pixel;  //viewport coordinates
+			Vector lens;
 
 			if (!antiA)
 			{
@@ -505,8 +506,10 @@ void renderScene()
 							pixel.y = y + (q + rand_float()) / GRID_N;
 						}
 
+						lens = sample_unit_disk() * scene->GetCamera()->GetAperture();
+
 						//YOUR 2 FUNCTIONS:
-						Ray ray = scene->GetCamera()->PrimaryRay(pixel);
+						Ray ray = scene->GetCamera()->PrimaryRay(lens, pixel);
 						color += rayTracing(ray, 1, 1.0).clamp();
 					}
 				}
