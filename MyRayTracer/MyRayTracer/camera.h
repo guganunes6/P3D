@@ -85,7 +85,8 @@ public:
 		Vector ray_dir;
 		Vector eye_offset;
 
-		Vector p = Vector(pixel_sample.x * focal_ratio, pixel_sample.y * focal_ratio, -plane_dist * focal_ratio);
+		Vector ps = Vector(w * (pixel_sample.x / res_x - 0.5), h * (pixel_sample.y / res_y - 0.5), 0);
+		Vector p = Vector(ps.x * focal_ratio, ps.y * focal_ratio, -plane_dist * focal_ratio);
 
 		ray_dir = (u * (p.x - lens_sample.x) + v * (p.y - lens_sample.y) + n * -plane_dist * focal_ratio);
 		ray_dir.normalize();
