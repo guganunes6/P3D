@@ -76,13 +76,16 @@ GLint UniformId;
 
 Scene* scene = NULL;
 int RES_X, RES_Y;
-float GRID_N = 4.0f;
+float SPProot = 4.0f;
 
 bool jittering = false;
 bool antiA = false;
 
 int WindowHandle = 0;
 
+typedef enum { NONE, GRID_ACC, BVH_ACC } Accelerator;
+Accelerator Accel_Struct = GRID_ACC;
+Grid* grid_ptr;
 
 Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of medium 1 where the ray is travelling
 {
@@ -93,29 +96,43 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	float light_plane = 0.5f;
 	Vector a = Vector(light_plane, 0.0f, 0.0f);
 	Vector b = Vector(0.0f, 0.0f, light_plane);
+	Vector hitPoint;
 
-	for (int i = 0; i < scene->getNumObjects(); i++)
-	{
-		Object* object = scene->getObject(i);
-		
-		if (object->intercepts(ray, t))
-		{
-			if (t < closestT)
-			{
-				closestObject = object;
-				closestT = t;
-			}
+	bool intercept = false;
+
+	if (Accel_Struct == GRID_ACC) {
+		if (grid_ptr->Traverse(ray, &closestObject, hitPoint)) {
+			intercept = true;
+
 		}
 	}
+	else {
+		for (int i = 0; i < scene->getNumObjects(); i++)
+		{
+			Object* object = scene->getObject(i);
+		
+			if (object->intercepts(ray, t))
+			{
+				if (t < closestT)
+				{
+					closestObject = object;
+					closestT = t;
+				}
+				intercept = true;
+			}
+		}
 
-	if (closestT == INFINITY) 
+		hitPoint = ray.origin + ray.direction * closestT;
+	}
+
+
+	if (!intercept) 
 	{
 		return scene->GetBackgroundColor();
 	}
 
 	else 
 	{
-		Vector hitPoint = ray.origin + ray.direction * closestT;
 		Vector normal = closestObject->getNormal(hitPoint);
 		bool outside = true;
 		if (ray.direction * normal > 0)
@@ -146,16 +163,24 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 						shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint).normalize());
 						in_shadow = false;
 
-						for (int i = 0; i < scene->getNumObjects(); i++)
-						{
-							Object* object = scene->getObject(i);
-
-							if (!object->intercepts(shadowRay, t)) continue;
-
-							else
-							{
+						if (Accel_Struct == GRID_ACC) {
+							if (grid_ptr->Traverse(ray)) {
 								in_shadow = true;
-								break;
+
+							}
+						}
+						else {
+							for (int i = 0; i < scene->getNumObjects(); i++)
+							{
+								Object* object = scene->getObject(i);
+
+								if (!object->intercepts(shadowRay, t)) continue;
+
+								else
+								{
+									in_shadow = true;
+									break;
+								}
 							}
 						}
 
@@ -173,11 +198,11 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					else
 					{
 						int in_shadow_count = 0;
-						for (int p = 0; p < GRID_N; p++)
+						for (int p = 0; p < SPProot; p++)
 						{
-							for (int q = 0; q < GRID_N; q++)
+							for (int q = 0; q < SPProot; q++)
 							{
-								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / GRID_N), light->position.y, light->position.z + ((q + rand_float()) / GRID_N));
+								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / SPProot), light->position.y, light->position.z + ((q + rand_float()) / SPProot));
 								Vector L = lightPos - shadowHitPoint;
 								L.normalize();
 								shadowRay = Ray(shadowHitPoint, L);
@@ -201,7 +226,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 						H.normalize();
 						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
 						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-						color += (colorDiff + colorSpec) * ((GRID_N * GRID_N - in_shadow_count) / (GRID_N * GRID_N));
+						color += (colorDiff + colorSpec) * ((SPProot * SPProot - in_shadow_count) / (SPProot * SPProot));
 					}
 				}
 			}
@@ -490,20 +515,20 @@ void renderScene()
 			}
 			else
 			{
-				for (int p = 0; p < GRID_N; p++)
+				for (int p = 0; p < SPProot; p++)
 				{
-					for (int q = 0; q < GRID_N; q++)
+					for (int q = 0; q < SPProot; q++)
 					{
 
 						if (!jittering)
 						{
-							pixel.x = x + (p + 0.5f) / GRID_N;
-							pixel.y = y + (q + 0.5f) / GRID_N;
+							pixel.x = x + (p + 0.5f) / SPProot;
+							pixel.y = y + (q + 0.5f) / SPProot;
 						}
 						else
 						{
-							pixel.x = x + (p + rand_float()) / GRID_N;
-							pixel.y = y + (q + rand_float()) / GRID_N;
+							pixel.x = x + (p + rand_float()) / SPProot;
+							pixel.y = y + (q + rand_float()) / SPProot;
 						}
 
 						lens = sample_unit_disk() * scene->GetCamera()->GetAperture();
@@ -514,7 +539,7 @@ void renderScene()
 					}
 				}
 
-				color = color * (1.0f / (GRID_N * GRID_N));
+				color = color * (1.0f / (SPProot * SPProot));
 			}
 
 			img_Data[counter++] = u8fromfloat((float)color.r());
@@ -806,6 +831,17 @@ void init_scene(void)
 	RES_X = scene->GetCamera()->GetResX();
 	RES_Y = scene->GetCamera()->GetResY();
 	printf("\nResolutionX = %d  ResolutionY= %d.\n", RES_X, RES_Y);
+
+	if (Accel_Struct == GRID_ACC) {
+		grid_ptr = new Grid();
+		vector<Object*> objs;
+		int num_objects = scene->getNumObjects();
+		for (int o = 0; o < num_objects; o++) {
+			objs.push_back(scene->getObject(o));
+		}
+		grid_ptr->Build(objs);
+		printf("Grid built.\n\n");
+	}
 
 	// Pixel buffer to be used in the Save Image function
 	img_Data = (uint8_t*)malloc(3 * RES_X*RES_Y * sizeof(uint8_t));
