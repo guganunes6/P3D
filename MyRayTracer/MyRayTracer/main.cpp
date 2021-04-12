@@ -20,8 +20,8 @@
 #include <GL/freeglut.h>
 #include <IL/il.h>
 
+#include "rayAccelerator.h"
 #include "scene.h"
-#include "grid.h"
 #include "maths.h"
 #include "sampler.h"
 
