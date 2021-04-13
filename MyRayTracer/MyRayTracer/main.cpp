@@ -31,7 +31,7 @@
 #define COLOR_ATTRIB 1
 
 #define MAX_DEPTH 5
-#define SHADOW_BIAS 0.0001
+#define SHADOW_BIAS 0.001
 
 unsigned int FrameCount = 0;
 

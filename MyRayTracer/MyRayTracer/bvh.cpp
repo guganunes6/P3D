@@ -51,6 +51,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		node->makeLeaf(left_index, right_index - left_index);
 	}
 	else {
+		//do it by the centroid of the objects, not the bbox
 		Vector max = node->getAABB().max;
 		Vector min = node->getAABB().min;
 
@@ -129,72 +130,78 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 }
 
 bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
-			float tmp;
-			float tmin = FLT_MAX;  //contains the closest primitive intersection
-			bool hit = false;
+		float tmp;
+		float closestT = FLT_MAX;  //contains the closest primitive intersection
+		bool hit = false;
 
-			Ray local_ray = ray;
+		Ray local_ray = ray;
 
-			BVHNode* currentNode = nodes[0];
+		BVHNode* currentNode = nodes[0];
 
-			float t;
-			if (!currentNode->getAABB().intercepts(local_ray, t)) return false;
+		float t;
+		if (!currentNode->getAABB().intercepts(local_ray, t)) return false;
 
-			float tmp_left;
-			float tmp_right;
+		float tmp_left;
+		float tmp_right;
 
-			while (true) {
-				if (!currentNode->isLeaf()) {
-				
-					bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
-					bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
+		while (true) {
+			if (!currentNode->isLeaf()) {
+				bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
+				bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
 
-					if(intercept_left && intercept_right){
-						tmin = (tmp_left < tmp_right) ? tmp_left : tmp_right;
-						if (tmp_left < tmp_right) {
-							tmin = tmp_left;
-							StackItem si = StackItem(nodes[currentNode->getIndex()], tmin);
-							hit_stack.push(si);
-						}
-						else {
-							tmin = tmp_right;
-							StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmin);
-							hit_stack.push(si);
-						}
-						continue;
-					}
-
-					else if (intercept_right) {
-						tmin = tmp_right;
-						currentNode = nodes[currentNode->getIndex() + 1];
-						continue;
-					}
-					else if (intercept_left) {
-						tmin = tmp_left;
+				if(intercept_left && intercept_right){
+					if (tmp_left < tmp_right) {
+						StackItem si = StackItem(nodes[currentNode->getIndex()], tmp_right);
+						hit_stack.push(si);
 						currentNode = nodes[currentNode->getIndex()];
-						continue;
 					}
-				}
-				else {
-					float closestT = FLT_MAX;
-					for (int i = currentNode->getIndex(); i < currentNode->getNObjs(); i++) {
-						if (objects[i]->intercepts(local_ray, tmp)) {
-							if (tmp < closestT)
-							{
-								*hit_obj = objects[i];
-								closestT = tmp;
-							}
-						}
+					else {
+						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_left);
+						hit_stack.push(si);
+						currentNode = nodes[currentNode->getIndex() + 1];
 					}
-					hit_point = local_ray.origin + local_ray.direction * closestT;
+					continue;
 				}
 
-				//endif
-				//pop from stack TODO
+				else if (intercept_right) {
+					currentNode = nodes[currentNode->getIndex() + 1];
+					continue;
+				}
+				else if (intercept_left) {
+					currentNode = nodes[currentNode->getIndex()];
+					continue;
+				}
 			}
-			
-			//PUT YOUR CODE HERE
-			return false;
+			else {
+				for (int i = currentNode->getIndex(); i < currentNode->getNObjs(); i++) {
+					if (objects[i]->intercepts(local_ray, tmp)) {
+						if (tmp < closestT)
+						{
+							*hit_obj = objects[i];
+							closestT = tmp;
+							hit = true;
+						}
+					}
+				}
+				hit_point = local_ray.origin + local_ray.direction * closestT;
+			}
+
+			StackItem popped_item = StackItem(new BVHNode(), 0);
+
+			while (!hit_stack.empty()) {
+				popped_item = hit_stack.top();
+				hit_stack.pop();
+				if (popped_item.t < closestT) {
+					currentNode = popped_item.ptr;
+					continue;
+				}
+			}
+
+			if (hit) return true;
+
+			else if (!hit) return false;
+
+		}
 	}
 
 bool BVH::Traverse(Ray& ray) {  //shadow ray with length
