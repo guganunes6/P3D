@@ -60,7 +60,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 
 		int dimension = (diff.x == aabb_dimension) ? 0 : (diff.y == aabb_dimension) ? 1 : 2;
 
-		Comparator cmp;
+		Comparator cmp = Comparator();
 		cmp.dimension = dimension;
 
 		std::sort(objects.begin() + left_index, objects.begin() + right_index, cmp);
@@ -77,6 +77,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 				break;
 			}
 		}
+		//
 		if (split_index == 0 || split_index == right_index - left_index) {
 			split_index = round((right_index - left_index) / 2);
 		}
@@ -112,6 +113,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 
 		//Initiate current node as an interior node
 		node->makeNode(nodes.size());
+
 		nodes.push_back(left_node);
 		nodes.push_back(right_node);
 
@@ -131,7 +133,65 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 			float tmin = FLT_MAX;  //contains the closest primitive intersection
 			bool hit = false;
 
+			Ray local_ray = ray;
+
 			BVHNode* currentNode = nodes[0];
+
+			float t;
+			if (!currentNode->getAABB().intercepts(local_ray, t)) return false;
+
+			float tmp_left;
+			float tmp_right;
+
+			while (true) {
+				if (!currentNode->isLeaf()) {
+				
+					bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
+					bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
+
+					if(intercept_left && intercept_right){
+						tmin = (tmp_left < tmp_right) ? tmp_left : tmp_right;
+						if (tmp_left < tmp_right) {
+							tmin = tmp_left;
+							StackItem si = StackItem(nodes[currentNode->getIndex()], tmin);
+							hit_stack.push(si);
+						}
+						else {
+							tmin = tmp_right;
+							StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmin);
+							hit_stack.push(si);
+						}
+						continue;
+					}
+
+					else if (intercept_right) {
+						tmin = tmp_right;
+						currentNode = nodes[currentNode->getIndex() + 1];
+						continue;
+					}
+					else if (intercept_left) {
+						tmin = tmp_left;
+						currentNode = nodes[currentNode->getIndex()];
+						continue;
+					}
+				}
+				else {
+					float closestT = FLT_MAX;
+					for (int i = currentNode->getIndex(); i < currentNode->getNObjs(); i++) {
+						if (objects[i]->intercepts(local_ray, tmp)) {
+							if (tmp < closestT)
+							{
+								*hit_obj = objects[i];
+								closestT = tmp;
+							}
+						}
+					}
+					hit_point = local_ray.origin + local_ray.direction * closestT;
+				}
+
+				//endif
+				//pop from stack TODO
+			}
 			
 			//PUT YOUR CODE HERE
 			return false;
