@@ -46,6 +46,8 @@ void BVH::Build(vector<Object *> &objs) {
 		}
 
 void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
+	//std::cout << " left " << left_index << std::endl;
+	//std::cout << " right " << right_index << std::endl;
 	   //PUT YOUR CODE HERE
 	if ((right_index - left_index) <= Threshold) {
 		node->makeLeaf(left_index, right_index - left_index);
@@ -64,23 +66,22 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		Comparator cmp = Comparator();
 		cmp.dimension = dimension;
 
-		std::sort(objects.begin() + left_index, objects.begin() + right_index, cmp);
+		std::sort(objects.begin() + left_index, objects.begin() + right_index - 1, cmp);
 		
 		//find split index
-		int split_index = 0;
+		int split_index = left_index;
 
 		for (int i = left_index; i < right_index; i++) {
 			if (objects[i]->GetBoundingBox().centroid().getAxisValue(dimension) < min.getAxisValue(dimension) + aabb_dimension / 2) {
 				split_index++;
 			}
 			else {
-				split_index++;
 				break;
 			}
 		}
 		//
-		if (split_index == 0 || split_index == right_index - left_index) {
-			split_index = round((right_index - left_index) / 2);
+		if (split_index == left_index || split_index == right_index - left_index) {
+			split_index = left_index + round((right_index - left_index) / 2.0f);
 		}
 
 		BVHNode* left_node = new BVHNode();
@@ -91,6 +92,8 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		AABB bbox_left = AABB(min_left, max_left);
 
 		for (int i = left_index; i < split_index; i++) {
+			//std::cout << "objects left " << i << std::endl;
+			//std::cout << "nodes count left " << nodes.size() << std::endl;
 			AABB bbox = objects[i]->GetBoundingBox();
 			bbox_left.extend(bbox);
 		}
@@ -104,6 +107,8 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		AABB bbox_right = AABB(min_right, max_right);
 
 		for (int i = split_index; i < right_index; i++) {
+			//std::cout << "objects right " << i << std::endl;
+			//std::cout << "nodes count right " << nodes.size() << std::endl;
 			AABB bbox = objects[i]->GetBoundingBox();
 			bbox_right.extend(bbox);
 		}
@@ -151,12 +156,12 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 
 				if(intercept_left && intercept_right){
 					if (tmp_left < tmp_right) {
-						StackItem si = StackItem(nodes[currentNode->getIndex()], tmp_right);
+						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);
 						hit_stack.push(si);
 						currentNode = nodes[currentNode->getIndex()];
 					}
 					else {
-						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_left);
+						StackItem si = StackItem(nodes[currentNode->getIndex()], tmp_left);
 						hit_stack.push(si);
 						currentNode = nodes[currentNode->getIndex() + 1];
 					}
@@ -188,14 +193,18 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 
 			StackItem popped_item = StackItem(new BVHNode(), 0);
 
+			bool node_from_stack = false;
 			while (!hit_stack.empty()) {
 				popped_item = hit_stack.top();
 				hit_stack.pop();
 				if (popped_item.t < closestT) {
 					currentNode = popped_item.ptr;
-					continue;
+					node_from_stack = true;
+					break;
 				}
 			}
+
+			if (node_from_stack) continue;
 
 			if (hit) return true;
 
