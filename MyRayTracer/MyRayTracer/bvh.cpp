@@ -239,11 +239,20 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
 				bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
 				bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
 
+				if (nodes[currentNode->getIndex()]->getAABB().isInside(local_ray.origin)) tmp_left = 0;
+				if (nodes[currentNode->getIndex() + 1]->getAABB().isInside(local_ray.origin)) tmp_right = 0;
+				
 				if (intercept_left && intercept_right) {
-					StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);
-					hit_stack.push(si);
-					currentNode = nodes[currentNode->getIndex()];
-					
+					if (tmp_left < tmp_right) {
+						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);
+						hit_stack.push(si);
+						currentNode = nodes[currentNode->getIndex()];
+					}
+					else {
+						StackItem si = StackItem(nodes[currentNode->getIndex()], tmp_left);
+						hit_stack.push(si);
+						currentNode = nodes[currentNode->getIndex() + 1];
+					}
 					continue;
 				}
 
@@ -264,16 +273,14 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
 				}
 			}
 
-			StackItem popped_item = StackItem(new BVHNode(), 0);
+			if (hit_stack.empty()) return false;
 
-			if (!hit_stack.empty()) {
-				popped_item = hit_stack.top();
+			else {
+				StackItem popped_item = hit_stack.top();
 				hit_stack.pop();
 
 				currentNode = popped_item.ptr;
-				continue;
 			}
-			else return false;
 
 		}
 	}		

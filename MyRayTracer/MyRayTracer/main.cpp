@@ -32,6 +32,7 @@
 
 #define MAX_DEPTH 6
 #define SHADOW_BIAS 0.001
+#define ROUGHNESS_PARAM 0.3
 
 unsigned int FrameCount = 0;
 
@@ -82,14 +83,24 @@ float SPProot_shadow = 2.0f;
 bool jittering = false;
 bool antiA = false;
 bool soft_shadows = true;
+bool fuzzy = false;
 
 int WindowHandle = 0;
 
 typedef enum { NONE, GRID_ACC, BVH_ACC } Accelerator;
-Accelerator Accel_Struct = BVH_ACC;
+Accelerator Accel_Struct = GRID_ACC;
 Grid* grid_ptr;
 BVH* bvh_ptr;
 
+Vector getFuzzyReflectedRay(Vector R, Vector normal) {
+	Vector o = rand_in_unit_sphere();
+	Vector fuzzy_reflected_ray = (R + o * ROUGHNESS_PARAM).normalize();
+
+	if (fuzzy_reflected_ray * normal > 0) {
+		return fuzzy_reflected_ray;
+	}
+	else return R;
+}
 Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of medium 1 where the ray is travelling
 {
 	float t;
@@ -141,7 +152,8 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 	if (!intercept) 
 	{
-		return scene->GetBackgroundColor();
+		if (scene->GetSkyBoxFlg()) return scene->GetSkyboxColor(ray);
+		else return scene->GetBackgroundColor();
 	}
 
 	else 
@@ -234,12 +246,12 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 							for (int q = 0; q < SPProot_shadow; q++)
 							{
 								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / SPProot), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
-								Vector L = lightPos - shadowHitPoint;
+								Vector r = lightPos - shadowHitPoint;
 								
 
 								//USING GRID
 								if (Accel_Struct == GRID_ACC) {
-									shadowRay = Ray(shadowHitPoint, L);
+									shadowRay = Ray(shadowHitPoint, r);
 									if (grid_ptr->Traverse(shadowRay)) {
 										in_shadow = true;
 										in_shadow_count++;
@@ -248,7 +260,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 								//USING BVH
 								else if (Accel_Struct == BVH_ACC) {
-									shadowRay = Ray(shadowHitPoint, L);
+									shadowRay = Ray(shadowHitPoint, r);
 									if (bvh_ptr->Traverse(shadowRay)) {
 										in_shadow = true;
 										in_shadow_count++;
@@ -257,7 +269,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 								//USING NONE
 								else{
-									shadowRay = Ray(shadowHitPoint, L.normalize());
+									shadowRay = Ray(shadowHitPoint, r.normalize());
 									for (int i = 0; i < scene->getNumObjects(); i++)
 									{
 										Object* object = scene->getObject(i);
@@ -302,6 +314,12 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 			V.normalize();
 
 			Vector reflectedRayDirection = normal * (V * normal) * 2 - V;
+
+			//for fuzzy reflections
+			if (fuzzy) {
+				reflectedRayDirection = getFuzzyReflectedRay(reflectedRayDirection, normal);
+			}
+			
 			Ray reflectedRay = Ray(shadowHitPoint, reflectedRayDirection); // shadowHitPoint is also used here so that the point is never inside the object
 			Color rColor = rayTracing(reflectedRay, depth + 1, ior_1);
 
