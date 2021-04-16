@@ -30,7 +30,7 @@
 #define VERTEX_COORD_ATTRIB 0
 #define COLOR_ATTRIB 1
 
-#define MAX_DEPTH 5
+#define MAX_DEPTH 6
 #define SHADOW_BIAS 0.001
 
 unsigned int FrameCount = 0;
@@ -80,7 +80,8 @@ float SPProot = 4.0f;
 float SPProot_shadow = 2.0f;
 
 bool jittering = false;
-bool antiA = true;
+bool antiA = false;
+bool soft_shadows = true;
 
 int WindowHandle = 0;
 
@@ -174,12 +175,21 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					{
 						Vector r = light->position + a * rand_float() + b * rand_float();
 
-						shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
 						in_shadow = false;
 
 						//USING GRID
 						if (Accel_Struct == GRID_ACC) {
+							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
 							if (grid_ptr->Traverse(shadowRay)) {
+								in_shadow = true;
+
+							}
+						}
+
+						//USING BVH
+						else if (Accel_Struct == BVH_ACC) {
+							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
+							if (bvh_ptr->Traverse(shadowRay)) {
 								in_shadow = true;
 
 							}
@@ -187,6 +197,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 						//USING NONE
 						else {
+							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint).normalize());
 							for (int i = 0; i < scene->getNumObjects(); i++)
 							{
 								Object* object = scene->getObject(i);
@@ -224,11 +235,21 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 							{
 								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / SPProot), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
 								Vector L = lightPos - shadowHitPoint;
-								shadowRay = Ray(shadowHitPoint, L);
+								
 
 								//USING GRID
 								if (Accel_Struct == GRID_ACC) {
+									shadowRay = Ray(shadowHitPoint, L);
 									if (grid_ptr->Traverse(shadowRay)) {
+										in_shadow = true;
+										in_shadow_count++;
+									}
+								}
+
+								//USING BVH
+								else if (Accel_Struct == BVH_ACC) {
+									shadowRay = Ray(shadowHitPoint, L);
+									if (bvh_ptr->Traverse(shadowRay)) {
 										in_shadow = true;
 										in_shadow_count++;
 									}
@@ -236,6 +257,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 								//USING NONE
 								else{
+									shadowRay = Ray(shadowHitPoint, L.normalize());
 									for (int i = 0; i < scene->getNumObjects(); i++)
 									{
 										Object* object = scene->getObject(i);

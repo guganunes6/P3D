@@ -48,6 +48,9 @@ void BVH::Build(vector<Object *> &objs) {
 void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 	//std::cout << " left " << left_index << std::endl;
 	//std::cout << " right " << right_index << std::endl;
+	if (left_index == 25 && right_index == 28) {
+		//std::cout << " right " << right_index << std::endl;
+	}
 	   //PUT YOUR CODE HERE
 	if ((right_index - left_index) <= Threshold) {
 		node->makeLeaf(left_index, right_index - left_index);
@@ -66,13 +69,16 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		Comparator cmp = Comparator();
 		cmp.dimension = dimension;
 
-		std::sort(objects.begin() + left_index, objects.begin() + right_index - 1, cmp);
+		std::sort(objects.begin() + left_index, objects.begin() + right_index, cmp);
 		
 		//find split index
 		int split_index = left_index;
 
 		for (int i = left_index; i < right_index; i++) {
-			if (objects[i]->GetBoundingBox().centroid().getAxisValue(dimension) < min.getAxisValue(dimension) + aabb_dimension / 2) {
+			float centroid_value = objects[i]->GetBoundingBox().centroid().getAxisValue(dimension);
+			float mid_point = min.getAxisValue(dimension) + aabb_dimension / 2;
+
+			if (centroid_value < mid_point){
 				split_index++;
 			}
 			else {
@@ -80,7 +86,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 			}
 		}
 		//
-		if (split_index == left_index || split_index == right_index - left_index) {
+		if (split_index == left_index || split_index == right_index) {
 			split_index = left_index + round((right_index - left_index) / 2.0f);
 		}
 
@@ -178,7 +184,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 				}
 			}
 			else {
-				for (int i = currentNode->getIndex(); i < currentNode->getNObjs(); i++) {
+				for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
 					if (objects[i]->intercepts(local_ray, tmp)) {
 						if (tmp < closestT)
 						{
@@ -214,11 +220,60 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 	}
 
 bool BVH::Traverse(Ray& ray) {  //shadow ray with length
-			float tmp;
+		double length = ray.direction.length(); //distance between light and intersection point
+		ray.direction.normalize();
 
-			double length = ray.direction.length(); //distance between light and intersection point
-			ray.direction.normalize();
+		float tmp;
+		Ray local_ray = ray;
 
-			//PUT YOUR CODE HERE
-			return false;
+		BVHNode* currentNode = nodes[0];
+
+		float t;
+		if (!currentNode->getAABB().intercepts(local_ray, t)) return false;
+
+		float tmp_left;
+		float tmp_right;
+
+		while (true) {
+			if (!currentNode->isLeaf()) {
+				bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
+				bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
+
+				if (intercept_left && intercept_right) {
+					StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);
+					hit_stack.push(si);
+					currentNode = nodes[currentNode->getIndex()];
+					
+					continue;
+				}
+
+				else if (intercept_right) {
+					currentNode = nodes[currentNode->getIndex() + 1];
+					continue;
+				}
+				else if (intercept_left) {
+					currentNode = nodes[currentNode->getIndex()];
+					continue;
+				}
+			}
+			else {
+				for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
+					if (objects[i]->intercepts(local_ray, tmp) && tmp < length) {
+						return true;
+					}
+				}
+			}
+
+			StackItem popped_item = StackItem(new BVHNode(), 0);
+
+			if (!hit_stack.empty()) {
+				popped_item = hit_stack.top();
+				hit_stack.pop();
+
+				currentNode = popped_item.ptr;
+				continue;
+			}
+			else return false;
+
+		}
 	}		
