@@ -160,6 +160,9 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 				bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
 				bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
 
+				if (nodes[currentNode->getIndex()]->getAABB().isInside(local_ray.origin)) tmp_left = 0;
+				if (nodes[currentNode->getIndex() + 1]->getAABB().isInside(local_ray.origin)) tmp_right = 0;
+
 				if(intercept_left && intercept_right){
 					if (tmp_left < tmp_right) {
 						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);

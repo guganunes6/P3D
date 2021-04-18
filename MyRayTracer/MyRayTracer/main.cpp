@@ -78,7 +78,7 @@ GLint UniformId;
 Scene* scene = NULL;
 int RES_X, RES_Y;
 float SPProot = 4.0f;
-float SPProot_shadow = 2.0f;
+float SPProot_shadow = 1.0f;
 
 bool jittering = false;
 bool antiA = false;
@@ -101,6 +101,49 @@ Vector getFuzzyReflectedRay(Vector R, Vector normal) {
 	}
 	else return R;
 }
+
+bool interceptObject(Ray& ray, Object** closestObject, Vector& hitPoint) {
+	float closestT = INFINITY;
+	float t;
+	bool intercept = false;
+
+	for (int i = 0; i < scene->getNumObjects(); i++)
+	{
+		Object* object = scene->getObject(i);
+
+		if (object->intercepts(ray, t))
+		{
+			if (t < closestT)
+			{
+				*closestObject = object;
+				closestT = t;
+				intercept = true;
+			}
+		}
+	}
+
+	hitPoint = ray.origin + ray.direction * closestT;
+	return intercept;
+}
+
+bool interceptObject(Ray& ray) {
+	float closestT = INFINITY;
+	float t;
+
+	for (int i = 0; i < scene->getNumObjects(); i++)
+	{
+		Object* object = scene->getObject(i);
+
+		if (!object->intercepts(ray, t)) continue;
+
+		else
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of medium 1 where the ray is travelling
 {
 	float t;
@@ -131,22 +174,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 
 	//USING NONE
 	else {
-		for (int i = 0; i < scene->getNumObjects(); i++)
-		{
-			Object* object = scene->getObject(i);
-		
-			if (object->intercepts(ray, t))
-			{
-				if (t < closestT)
-				{
-					closestObject = object;
-					closestT = t;
-				}
-				intercept = true;
-			}
-		}
-
-		hitPoint = ray.origin + ray.direction * closestT;
+		intercept = interceptObject(ray, &closestObject, hitPoint);
 	}
 
 
@@ -156,6 +184,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		else return scene->GetBackgroundColor();
 	}
 
+	//there is an interception
 	else 
 	{
 		Vector normal = closestObject->getNormal(hitPoint);
@@ -210,18 +239,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 						//USING NONE
 						else {
 							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint).normalize());
-							for (int i = 0; i < scene->getNumObjects(); i++)
-							{
-								Object* object = scene->getObject(i);
-
-								if (!object->intercepts(shadowRay, t)) continue;
-
-								else
-								{
-									in_shadow = true;
-									break;
-								}
-							}
+							in_shadow = interceptObject(shadowRay);
 						}
 
 						if (!in_shadow)
@@ -247,6 +265,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 							{
 								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / SPProot), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
 								Vector r = lightPos - shadowHitPoint;
+								r = light->position - shadowHitPoint;
 								
 
 								//USING GRID
@@ -277,22 +296,23 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 										if (!object->intercepts(shadowRay, t)) continue;
 										else
 										{
-											in_shadow_count++;
 											in_shadow = true;
+											in_shadow_count++;
 											break;
 										}
 									}
 								}
 							}
 						}
-
-						Vector V = ray.origin - shadowHitPoint;
-						V.normalize();
-						Vector H = (L + V) / 2;
-						H.normalize();
-						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
-						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-						color += (colorDiff + colorSpec) * ((SPProot_shadow * SPProot_shadow - in_shadow_count) / (SPProot_shadow * SPProot_shadow));
+						if (!in_shadow) {
+							Vector V = ray.origin - shadowHitPoint;
+							V.normalize();
+							Vector H = (L + V) / 2;
+							H.normalize();
+							Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+							Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
+							color += (colorDiff + colorSpec);// *((SPProot_shadow* SPProot_shadow - in_shadow_count) / (SPProot_shadow * SPProot_shadow));
+						}
 					}
 				}
 			}
