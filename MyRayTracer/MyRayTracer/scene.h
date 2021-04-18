@@ -184,7 +184,7 @@ private:
 	Camera* camera;
 	Color bgColor;  //Background color
 
-	bool SkyBoxFlg = true;
+	bool SkyBoxFlg = false;
 
 	struct {
 		ILubyte *img;

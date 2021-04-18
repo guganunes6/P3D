@@ -77,10 +77,11 @@ GLint UniformId;
 
 Scene* scene = NULL;
 int RES_X, RES_Y;
-float SPProot = 4.0f;
-float SPProot_shadow = 1.0f;
+float SPProot = 2.0f;
+float SPProot_shadow = 2.0f;
+float SPProot_shadow_tmp;
 
-bool jittering = false;
+bool jittering = true;
 bool antiA = false;
 bool soft_shadows = true;
 bool fuzzy = false;
@@ -88,7 +89,7 @@ bool fuzzy = false;
 int WindowHandle = 0;
 
 typedef enum { NONE, GRID_ACC, BVH_ACC } Accelerator;
-Accelerator Accel_Struct = GRID_ACC;
+Accelerator Accel_Struct = BVH_ACC;
 Grid* grid_ptr;
 BVH* bvh_ptr;
 
@@ -129,6 +130,7 @@ bool interceptObject(Ray& ray, Object** closestObject, Vector& hitPoint) {
 bool interceptObject(Ray& ray) {
 	float closestT = INFINITY;
 	float t;
+	ray.direction.normalize();
 
 	for (int i = 0; i < scene->getNumObjects(); i++)
 	{
@@ -142,6 +144,23 @@ bool interceptObject(Ray& ray) {
 		}
 	}
 	return false;
+}
+
+bool inShadow(Ray& shadowRay) {
+	//USING GRID
+	if (Accel_Struct == GRID_ACC) {
+		return grid_ptr->Traverse(shadowRay);
+	}
+
+	//USING BVH
+	else if (Accel_Struct == BVH_ACC) {
+		return bvh_ptr->Traverse(shadowRay);
+	}
+
+	//USING NONE
+	else {
+		return interceptObject(shadowRay);
+	}
 }
 
 Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of medium 1 where the ray is travelling
@@ -211,99 +230,20 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					Ray shadowRay = Ray(Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 0.0f));
 					bool in_shadow = false;
 
+
 					//COM ANTIALIASING
 					if (antiA)
 					{
-						Vector r = light->position + a * rand_float() + b * rand_float();
+						Vector r;
+						if (soft_shadows) r = light->position + a * rand_float() + b * rand_float();
+						else r = light->position;
+						
+						shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
 
-						in_shadow = false;
-
-						//USING GRID
-						if (Accel_Struct == GRID_ACC) {
-							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
-							if (grid_ptr->Traverse(shadowRay)) {
-								in_shadow = true;
-
-							}
+						if (inShadow(shadowRay)) {
+							in_shadow = true;
 						}
 
-						//USING BVH
-						else if (Accel_Struct == BVH_ACC) {
-							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
-							if (bvh_ptr->Traverse(shadowRay)) {
-								in_shadow = true;
-
-							}
-						}
-
-						//USING NONE
-						else {
-							shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint).normalize());
-							in_shadow = interceptObject(shadowRay);
-						}
-
-						if (!in_shadow)
-						{
-							Vector V = ray.origin - shadowHitPoint;
-							V.normalize();
-							Vector H = (L + V) / 2;
-							H.normalize();
-							Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
-							Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-							color += colorDiff + colorSpec;
-						}
-					}
-
-					//SEM ANTIALIASING
-					else
-					{
-						//SOFT SHADOWS
-						int in_shadow_count = 0;
-						for (int p = 0; p < SPProot_shadow; p++)
-						{
-							for (int q = 0; q < SPProot_shadow; q++)
-							{
-								Vector lightPos = Vector( light->position.x + ((p + rand_float()) / SPProot), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
-								Vector r = lightPos - shadowHitPoint;
-								r = light->position - shadowHitPoint;
-								
-
-								//USING GRID
-								if (Accel_Struct == GRID_ACC) {
-									shadowRay = Ray(shadowHitPoint, r);
-									if (grid_ptr->Traverse(shadowRay)) {
-										in_shadow = true;
-										in_shadow_count++;
-									}
-								}
-
-								//USING BVH
-								else if (Accel_Struct == BVH_ACC) {
-									shadowRay = Ray(shadowHitPoint, r);
-									if (bvh_ptr->Traverse(shadowRay)) {
-										in_shadow = true;
-										in_shadow_count++;
-									}
-								}
-
-								//USING NONE
-								else{
-									shadowRay = Ray(shadowHitPoint, r.normalize());
-									for (int i = 0; i < scene->getNumObjects(); i++)
-									{
-										Object* object = scene->getObject(i);
-
-										if (!object->intercepts(shadowRay, t)) continue;
-										else
-										{
-											in_shadow = true;
-											in_shadow_count++;
-											break;
-										}
-									}
-								}
-							}
-						}
 						if (!in_shadow) {
 							Vector V = ray.origin - shadowHitPoint;
 							V.normalize();
@@ -311,7 +251,47 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 							H.normalize();
 							Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
 							Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
-							color += (colorDiff + colorSpec);// *((SPProot_shadow* SPProot_shadow - in_shadow_count) / (SPProot_shadow * SPProot_shadow));
+
+							color += (colorDiff + colorSpec);
+						}
+					}
+
+					//SEM ANTIALIASING
+					else
+					{
+						int in_shadow_count = 0;
+						for (int p = 0; p < SPProot_shadow; p++)
+						{
+							for (int q = 0; q < SPProot_shadow; q++)
+							{
+								Vector r;
+								if (soft_shadows) {
+									Vector lightPos = Vector(light->position.x + ((p + rand_float()) / SPProot_shadow), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
+									r = lightPos - shadowHitPoint;
+								}
+								else r = light->position - shadowHitPoint;
+								
+								shadowRay = Ray(shadowHitPoint, r);
+
+								if (inShadow(shadowRay)) {
+									in_shadow = true;
+									in_shadow_count++;
+								}
+							}
+						}
+
+						Vector V = ray.origin - shadowHitPoint;
+						V.normalize();
+						Vector H = (L + V) / 2;
+						H.normalize();
+						Color colorDiff = light->color * closestObject->GetMaterial()->GetDiffuse() * closestObject->GetMaterial()->GetDiffColor() * max((normal * L), 0.0f);
+						Color colorSpec = light->color * closestObject->GetMaterial()->GetSpecular() * closestObject->GetMaterial()->GetSpecColor() * pow(max((H * normal), 0.0f), closestObject->GetMaterial()->GetShine());
+						
+						if (soft_shadows) {
+							color += (colorDiff + colorSpec) * ((SPProot_shadow * SPProot_shadow - in_shadow_count) / (SPProot_shadow * SPProot_shadow));
+						}
+						else {
+							if (!in_shadow) color += (colorDiff + colorSpec);
 						}
 					}
 				}
@@ -728,6 +708,14 @@ void processKeys(unsigned char key, int xx, int yy)
 		case 'a':
 			antiA = !antiA;
 			break;
+
+		case 's':
+			soft_shadows = !soft_shadows;
+			if (soft_shadows) {
+				SPProot_shadow = SPProot_shadow_tmp;
+			}
+			else SPProot_shadow = 1.0f;
+			break;
 	}
 }
 
@@ -878,6 +866,10 @@ void init(int argc, char* argv[])
 	r = Eye.length();
 	beta = asinf(camY / r) * 180.0f / 3.14f;
 	alpha = atanf(camX / camZ) * 180.0f / 3.14f;
+
+	SPProot_shadow_tmp = SPProot_shadow;
+
+	if (!soft_shadows) SPProot_shadow = 1.0f;
 
 	setupGLUT(argc, argv);
 	setupGLEW();
