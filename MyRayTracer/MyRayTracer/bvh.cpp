@@ -98,8 +98,6 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		AABB bbox_left = AABB(min_left, max_left);
 
 		for (int i = left_index; i < split_index; i++) {
-			//std::cout << "objects left " << i << std::endl;
-			//std::cout << "nodes count left " << nodes.size() << std::endl;
 			AABB bbox = objects[i]->GetBoundingBox();
 			bbox_left.extend(bbox);
 		}
@@ -113,8 +111,6 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		AABB bbox_right = AABB(min_right, max_right);
 
 		for (int i = split_index; i < right_index; i++) {
-			//std::cout << "objects right " << i << std::endl;
-			//std::cout << "nodes count right " << nodes.size() << std::endl;
 			AABB bbox = objects[i]->GetBoundingBox();
 			bbox_right.extend(bbox);
 		}
@@ -149,6 +145,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 
 		BVHNode* currentNode = nodes[0];
 
+		//Does not intercept anything because scenes bb is not intercepted
 		float t;
 		if (!currentNode->getAABB().intercepts(local_ray, t)) return false;
 
@@ -160,9 +157,11 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 				bool intercept_left = nodes[currentNode->getIndex()]->getAABB().intercepts(local_ray, tmp_left);
 				bool intercept_right = nodes[currentNode->getIndex() + 1]->getAABB().intercepts(local_ray, tmp_right);
 
+				//if ray already inside the node, it stays as the current node, so tmp is put to 0, being the closest one.
 				if (nodes[currentNode->getIndex()]->getAABB().isInside(local_ray.origin)) tmp_left = 0;
 				if (nodes[currentNode->getIndex() + 1]->getAABB().isInside(local_ray.origin)) tmp_right = 0;
 
+				//if both nodes are intercepted put the one with the furthest interception in the stack and the other as the current node
 				if(intercept_left && intercept_right){
 					if (tmp_left < tmp_right) {
 						StackItem si = StackItem(nodes[currentNode->getIndex() + 1], tmp_right);
@@ -187,6 +186,7 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 				}
 			}
 			else {
+				//check the closest interception with the objects in the leaf node, hit = false if no interception
 				for (int i = currentNode->getIndex(); i < currentNode->getIndex() + currentNode->getNObjs(); i++) {
 					if (objects[i]->intercepts(local_ray, tmp)) {
 						if (tmp < closestT)
@@ -200,12 +200,14 @@ bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
 				hit_point = local_ray.origin + local_ray.direction * closestT;
 			}
 
+			//check stack to see any missing nodes that were hit
 			StackItem popped_item = StackItem(new BVHNode(), 0);
-
 			bool node_from_stack = false;
+
 			while (!hit_stack.empty()) {
 				popped_item = hit_stack.top();
 				hit_stack.pop();
+				//if node from stack has a closer interception point change the current node and continue algorithm
 				if (popped_item.t < closestT) {
 					currentNode = popped_item.ptr;
 					node_from_stack = true;

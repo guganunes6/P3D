@@ -51,6 +51,9 @@ Vector Triangle::getNormal(Vector point)
 //
 
 bool Triangle::intercepts(Ray& r, float& t ) {
+
+	//Barycentric coordinates
+
 	float a = points[1].x - points[0].x;
 	float b = points[2].x - points[0].x;
 	float c = -r.direction.x;
@@ -142,24 +145,28 @@ bool Sphere::intercepts(Ray& r, float& t )
 	float b = (center - r.origin) * r.direction;
 	float c = (center - r.origin) * (center - r.origin) - SqRadius;
 	
-
+	//ray origin outside
 	if (c > 0)
 	{
+		//sphere is behind the ray
 		if (b <= 0)
 		{
 			return false;
 		}
 
+		//complex root so no intersection
 		if (b * b - c <= 0)
 		{
 			return false;
 		}
 
+		//it is outside so we want the smallest root
 		t = b - sqrt(b * b - c);
 		return true;
 	}
 	else
 	{
+		//it inside so we want the largest root
 		t = b + sqrt(b * b - c);
 		return true;
 	}
@@ -207,7 +214,7 @@ bool aaBox::intercepts(Ray& ray, float& t)
 	Vector t_min;
 	Vector t_max;
 
-	//calculate intersection
+	//calculate intersection, as well as the tmin an tmax values for each dimension
 	double a = 1.0f / d.x;
 	if (a >= 0)
 	{
@@ -289,7 +296,8 @@ bool aaBox::intercepts(Ray& ray, float& t)
 		face_out = (c >= 0) ? Vector(0, 0, 1) : Vector(0, 0, -1);
 	}
 
-	//condition for a hit
+	//condition for a hit, the entering value must be smaller than the leaving value
+	//check if box is behind the ray origin (tL >0)
 
 	if (tE < tL && tL > 0)
 	{

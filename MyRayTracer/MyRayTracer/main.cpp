@@ -77,13 +77,13 @@ GLint UniformId;
 
 Scene* scene = NULL;
 int RES_X, RES_Y;
-float SPProot = 2.0f;
+float SPProot = 4.0f;
 float SPProot_shadow = 2.0f;
 float SPProot_shadow_tmp;
 
 bool jittering = true;
 bool antiA = false;
-bool soft_shadows = true;
+bool soft_shadows = false;
 bool fuzzy = false;
 
 int WindowHandle = 0;
@@ -169,9 +169,11 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 	float closestT = INFINITY;
 	Object* closestObject = NULL;
 	Color color;
-	float light_plane = 0.5f;
+
+	float light_plane = 0.5f; // for the soft shadows with antialiasing
 	Vector a = Vector(light_plane, 0.0f, 0.0f);
 	Vector b = Vector(0.0f, 0.0f, light_plane);
+
 	Vector hitPoint;
 
 	bool intercept = false;
@@ -196,7 +198,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		intercept = interceptObject(ray, &closestObject, hitPoint);
 	}
 
-
+	//not interception so the color is the background
 	if (!intercept) 
 	{
 		if (scene->GetSkyBoxFlg()) return scene->GetSkyboxColor(ray);
@@ -214,9 +216,9 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 			outside = false;
 		}
 
-		Vector shadowHitPoint = hitPoint + normal * SHADOW_BIAS; // this is the bias because of the acne thingy; only use this to calculate the shadows
+		Vector shadowHitPoint = hitPoint + normal * SHADOW_BIAS; // this is the bias because of the acne thingy;
 		
-		//CALCULAR CORES SO SE O RAIO ESTIVER FORA
+		//Only calculate the color if the ray is outside the object 
 		if (outside)
 		{
 			for (int i = 0; i < scene->getNumLights(); i++)
@@ -231,14 +233,14 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 					bool in_shadow = false;
 
 
-					//COM ANTIALIASING
+					//WITH ANTIALIASING
 					if (antiA)
 					{
-						Vector r;
-						if (soft_shadows) r = light->position + a * rand_float() + b * rand_float();
-						else r = light->position;
+						Vector direction;
+						if (soft_shadows) direction = light->position + a * rand_float() + b * rand_float() - shadowHitPoint;
+						else direction = light->position - shadowHitPoint;
 						
-						shadowRay = Ray(shadowHitPoint, (r - shadowHitPoint));
+						shadowRay = Ray(shadowHitPoint, direction);
 
 						if (inShadow(shadowRay)) {
 							in_shadow = true;
@@ -256,7 +258,7 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 						}
 					}
 
-					//SEM ANTIALIASING
+					//WITHOUT ANTIALIASING
 					else
 					{
 						int in_shadow_count = 0;
@@ -264,14 +266,14 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 						{
 							for (int q = 0; q < SPProot_shadow; q++)
 							{
-								Vector r;
+								Vector direction;
 								if (soft_shadows) {
 									Vector lightPos = Vector(light->position.x + ((p + rand_float()) / SPProot_shadow), light->position.y, light->position.z + ((q + rand_float()) / SPProot_shadow));
-									r = lightPos - shadowHitPoint;
+									direction = lightPos - shadowHitPoint;
 								}
-								else r = light->position - shadowHitPoint;
+								else direction = light->position - shadowHitPoint;
 								
-								shadowRay = Ray(shadowHitPoint, r);
+								shadowRay = Ray(shadowHitPoint, direction);
 
 								if (inShadow(shadowRay)) {
 									in_shadow = true;
@@ -301,7 +303,6 @@ Color rayTracing( Ray ray, int depth, float ior_1)  //index of refraction of med
 		if (depth >= MAX_DEPTH) return color;
 
 
-		
 		if (closestObject->GetMaterial()->GetSpecular() > 0)
 		{
 			//index of refraction
