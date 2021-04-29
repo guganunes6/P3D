@@ -40,13 +40,13 @@ void Grid::Build(vector<Object*>& objs) {
 
 	AABB grid_bbox = AABB(min, max);
 
-	//build the Grid BB and //insert scene objects in the Grid objects list
+	//build the Grid BB and insert scene objects in the Grid objects list
 	for (Object* obj : objs) {
 		AABB o_bbox = obj->GetBoundingBox();
 		grid_bbox.extend(o_bbox);
 		this->addObject(obj);
 	}
-	//slightly enlarge the grid box just for case
+	//slightly enlarge the grid box just in case
 	grid_bbox.min.x -= EPSILON; grid_bbox.min.y -= EPSILON; grid_bbox.min.z -= EPSILON;
 	grid_bbox.max.x += EPSILON; grid_bbox.max.y += EPSILON; grid_bbox.max.z += EPSILON;
 
@@ -60,7 +60,6 @@ void Grid::Build(vector<Object*>& objs) {
 
 	// compute the number of grid cells in the x, y, and z directions
 	double s = pow(this->getNumObjects() / (wx * wy * wz), 0.3333333);  //number of objects per unit of length
-	//double s = pow(100000 / (wx * wy * wz), 0.3333333);  //number of objects per unit of length
 	nx = m * wx * s + 1;
 	ny = m * wy * s + 1;
 	nz = m * wz * s + 1;
@@ -207,8 +206,6 @@ bool Grid::Init_Traverse(Ray& ray, int& ix, int& iy, int& iz, double& dtx, doubl
 
 	if (dx == 0.0) {
 		tx_next = FLT_MAX;
-		//ix_step = -1;  //doesn't matter. Never used
-	//	ix_stop = -1;  //doesn't matter. Never used
 	}
 
 	if (dy > 0) {
@@ -224,8 +221,6 @@ bool Grid::Init_Traverse(Ray& ray, int& ix, int& iy, int& iz, double& dtx, doubl
 
 	if (dy == 0.0) {
 		ty_next = FLT_MAX;
-	//	iy_step = -1;
-	//	iy_stop = -1;
 	}
 
 	if (dz > 0) {
@@ -241,8 +236,6 @@ bool Grid::Init_Traverse(Ray& ray, int& ix, int& iy, int& iz, double& dtx, doubl
 
 	if (dz == 0.0) {
 		tz_next = FLT_MAX;
-		//iz_step = -1;
-		//iz_stop = -1;
 	}
 	return true;
 }
@@ -326,7 +319,7 @@ bool Grid::Traverse(Ray& ray) {
 	int 	ix_stop, iy_stop, iz_stop;
 
 	/*Calculate the initial cell as well as the ray parameter increments per cell in the x, y, and z directions
-	Shadow ray always intersect the Grid bounding box. However due to rounding it may starts at the boundaries, which may result as no intersecting. Consider it as in shadow. */
+	Shadow ray always intersects the Grid bounding box. However due to rounding it may starts at the boundaries, which may result as no intersecting. Consider it as in shadow. */
 	if (!Init_Traverse(ray, ix, iy, iz, dtx, dty, dtz, tx_next, ty_next, tz_next, ix_step, iy_step, iz_step, ix_stop, iy_stop, iz_stop))
 		return true;
 

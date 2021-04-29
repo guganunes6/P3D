@@ -54,7 +54,7 @@ long myTime, timebase = 0, frame = 0;
 char s[32];
 
 //Enable OpenGL drawing.  
-bool drawModeEnabled = true;
+bool drawModeEnabled = false;
 
 bool P3F_scene = true; //choose between P3F scene or a built-in random scene
 
@@ -77,13 +77,14 @@ GLint UniformId;
 
 Scene* scene = NULL;
 int RES_X, RES_Y;
-float SPProot = 4.0f;
-float SPProot_shadow = 2.0f;
 float SPProot_shadow_tmp;
 
+float SPProot = 2.0f;
+float SPProot_shadow = 2.0f;
+
 bool jittering = true;
-bool antiA = false;
-bool soft_shadows = false;
+bool antiA = true;
+bool soft_shadows = true;
 bool fuzzy = false;
 
 int WindowHandle = 0;
@@ -606,7 +607,6 @@ void renderScene()
 
 						lens = sample_unit_disk() * scene->GetCamera()->GetAperture();
 
-						//YOUR 2 FUNCTIONS:
 						Ray ray = scene->GetCamera()->PrimaryRay(lens, pixel);
 						color += rayTracing(ray, 1, 1.0).clamp();
 					}
@@ -712,6 +712,7 @@ void processKeys(unsigned char key, int xx, int yy)
 
 		case 's':
 			soft_shadows = !soft_shadows;
+			//save the SPProot shadow value
 			if (soft_shadows) {
 				SPProot_shadow = SPProot_shadow_tmp;
 			}
@@ -937,7 +938,7 @@ void init_scene(void)
 			objs.push_back(scene->getObject(o));
 		}
 		bvh_ptr->Build(objs);
-		printf("BVH n n");
+		printf("BVH built.\n \n");
 	}
 
 	// Pixel buffer to be used in the Save Image function

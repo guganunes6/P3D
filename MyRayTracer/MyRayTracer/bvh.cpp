@@ -16,7 +16,6 @@ void BVH::BVHNode::makeLeaf(unsigned int index_, unsigned int n_objs_) {
 void BVH::BVHNode::makeNode(unsigned int left_index_) {
 	this->leaf = false;
 	this->index = left_index_; 
-			//this->n_objs = n_objs_; 
 }
 
 
@@ -42,16 +41,11 @@ void BVH::Build(vector<Object *> &objs) {
 			world_bbox.max.x += EPSILON; world_bbox.max.y += EPSILON; world_bbox.max.z += EPSILON;
 			root->setAABB(world_bbox);
 			nodes.push_back(root);
-			build_recursive(0, objects.size(), root); // -> root node takes all the 
+			build_recursive(0, objects.size(), root); 
 		}
 
 void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
-	//std::cout << " left " << left_index << std::endl;
-	//std::cout << " right " << right_index << std::endl;
-	if (left_index == 25 && right_index == 28) {
-		//std::cout << " right " << right_index << std::endl;
-	}
-	   //PUT YOUR CODE HERE
+
 	if ((right_index - left_index) <= Threshold) {
 		node->makeLeaf(left_index, right_index - left_index);
 	}
@@ -85,7 +79,7 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 				break;
 			}
 		}
-		//
+
 		if (split_index == left_index || split_index == right_index) {
 			split_index = left_index + round((right_index - left_index) / 2.0f);
 		}
@@ -128,12 +122,6 @@ void BVH::build_recursive(int left_index, int right_index, BVHNode *node) {
 		build_recursive(left_index, split_index, left_node);
 		build_recursive(split_index, right_index, right_node);
 	}
-
-		//right_index, left_index and split_index refer to the indices in the objects vector
-	   // do not confuse with left_nodde_index and right_node_index which refer to indices in the nodes vector. 
-	    // node.index can have a index of objects vector or a index of nodes vector
-			
-		
 }
 
 bool BVH::Traverse(Ray& ray, Object** hit_obj, Vector& hit_point) {
@@ -286,6 +274,5 @@ bool BVH::Traverse(Ray& ray) {  //shadow ray with length
 
 				currentNode = popped_item.ptr;
 			}
-
 		}
 	}		
