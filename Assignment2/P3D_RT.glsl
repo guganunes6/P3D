@@ -255,10 +255,24 @@ void main()
     gSeed = float(baseHash(floatBitsToUint(gl_FragCoord.xy))) / float(0xffffffffU) + iTime;
 
     vec2 mouse = iMouse.xy / iResolution.xy;
-    mouse.x = mouse.x * 2.0 - 1.0;
 
-    vec3 camPos = vec3(mouse.x * 10.0, mouse.y * 5.0, 8.0);
+    const float c_minCameraAngle = 0.01f;
+    const float c_maxCameraAngle = (pi - 0.01f);
+    const float c_cameraDistance = 8.0f;
+
+    vec3 camPos;
+
+    float angleX = -mouse.x * 16.0f;
+    float angleY = mix(c_minCameraAngle, c_maxCameraAngle, mouse.y);
+     
+    camPos.x = sin(angleX) * sin(angleY) * c_cameraDistance;
+    camPos.y = -cos(angleY) * c_cameraDistance;
+    camPos.z = cos(angleX) * sin(angleY) * c_cameraDistance;
+     
     vec3 camTarget = vec3(0.0, 0.0, -1.0);
+
+    camPos += camTarget;
+
     float fovy = 60.0;
     float aperture = 0.0;
     float distToFocus = 2.5;
