@@ -158,6 +158,7 @@ struct Material
     vec3 albedo;
     float roughness; // controls roughness for metals
     float refIdx; // index of refraction for dialectric
+    float refractionRoughness;
 };
 
 Material createDiffuseMaterial(vec3 albedo)
@@ -177,12 +178,13 @@ Material createMetalMaterial(vec3 albedo, float roughness)
     return m;
 }
 
-Material createDialectricMaterial(vec3 albedo, float refIdx)
+Material createDialectricMaterial(vec3 albedo, float refIdx, float refractionRoughness)
 {
     Material m;
     m.type = MT_DIALECTRIC;
     m.albedo = albedo;
     m.refIdx = refIdx;
+    m.refractionRoughness = refractionRoughness;
     return m;
 }
 
@@ -305,7 +307,11 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 
             vec3 refractedRayDirection = T * senoT + outwardNormal * -cosT;
 
-            rScattered = createRay(hitPoint, refractedRayDirection, rIn.t);
+            vec3 fuzzy_refracted_ray = normalize(refractedRayDirection + randomInUnitSphere(gSeed) * rec.material.refractionRoughness);
+            if(dot(fuzzy_refracted_ray, outwardNormal) < 0.0){
+                rScattered = createRay(hitPoint, fuzzy_refracted_ray, rIn.t);
+            }
+            else rScattered = createRay(hitPoint, refractedRayDirection, rIn.t);
             //atten *= vec3(1.0 - reflectProb); not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
         }
 

@@ -6,11 +6,13 @@
 
  #include "./common.glsl"
  #iChannel0 "self"
+ #iKeyboard
 
 bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
 {
     bool hit = false;
     rec.t = tmax;
+    float refractionRoughness = 0.05;
    
     if(hit_triangle(createTriangle(vec3(-10.0, -0.01, 10.0), vec3(10.0, -0.01, 10.0), vec3(-10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
     {
@@ -44,7 +46,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
         rec))
     {
         hit = true;
-        rec.material = createMetalMaterial(vec3(0.7, 0.6, 0.5), 0.0);
+        rec.material = createMetalMaterial(vec3(0.7, 0.6, 0.5), 0.3);
     }
 
     if(hit_sphere(
@@ -55,7 +57,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
         rec))
     {
         hit = true;
-        rec.material = createDialectricMaterial(vec3(1.0), 1.5);
+        rec.material = createDialectricMaterial(vec3(1.0), 1.5, refractionRoughness);
     }
 
 if(hit_sphere(
@@ -66,7 +68,7 @@ if(hit_sphere(
         rec))
     {
         hit = true;
-        rec.material = createDialectricMaterial(vec3(1.0), 1.5);
+        rec.material = createDialectricMaterial(vec3(1.0), 1.5, 0.0);
     }
    
     int numxy = 5;
@@ -154,7 +156,7 @@ if(hit_sphere(
                     {
                         hit = true;
                         rec.material.type = MT_DIALECTRIC;
-                        rec.material = createDialectricMaterial(hash3(seed), 1.5);
+                        rec.material = createDialectricMaterial(hash3(seed), 1.5, 0.0);
                     }
                 }
             }
@@ -249,7 +251,7 @@ vec3 rayColor(Ray r)
 }
 
 #define MAX_SAMPLES 10000.0
-
+#iUniform float fovy = 60.0 in {30.0, 90.0}
 void main()
 {
     gSeed = float(baseHash(floatBitsToUint(gl_FragCoord.xy))) / float(0xffffffffU) + iTime;
@@ -272,12 +274,11 @@ void main()
     vec3 camTarget = vec3(0.0, 0.0, -1.0);
 
     camPos += camTarget;
-
-    float fovy = 60.0;
     float aperture = 0.0;
     float distToFocus = 2.5;
     float time0 = 0.0;
     float time1 = 1.0;
+    
     Camera cam = createCamera(
         camPos,
         camTarget,
@@ -292,13 +293,13 @@ void main()
 //usa-se o 4 canal de cor para guardar o numero de samples e não o iFrame pois quando se mexe o rato faz-se reset
 
     vec4 prev = texture(iChannel0, gl_FragCoord.xy / iResolution.xy);
-    vec3 prevLinear = toLinear(prev.xyz);  
+    vec3 prevLinear = toLinear(prev.xyz);
 
     vec2 ps = gl_FragCoord.xy + hash2(gSeed);
     //vec2 ps = gl_FragCoord.xy;
     vec3 color = rayColor(getRay(cam, ps));
 
-    if(iMouseButton.x != 0.0 || iMouseButton.y != 0.0)
+    if(iMouseButton.x != 0.0 || iMouseButton.y != 0.0 || isKeyDown(32))
     {
         gl_FragColor = vec4(toGamma(color), 1.0);  //samples number reset = 1
         return;
