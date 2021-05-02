@@ -222,8 +222,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
     if(rec.material.type == MT_METAL)
     {
        //INSERT CODE HERE, consider fuzzy reflections
-        vec3 V = normalize(rIn.o - rec.pos);
-		vec3 R = rec.normal * dot(V, rec.normal) * 2.0 - V;
+		vec3 R = reflect(rIn.d, rec.normal);
         vec3 hitPoint = rec.pos + rec.normal * 0.001;
 
         vec3 fuzzy_reflected_ray = normalize(R + randomInUnitSphere(gSeed) * rec.material.roughness);
@@ -285,8 +284,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 
         if( hash1(gSeed) < reflectProb) 
         { //Reflection
-            vec3 V = normalize(rIn.o - rec.pos);
-            vec3 R = rec.normal * dot(V, outwardNormal) * 2.0 - V;
+            vec3 R = reflect(rIn.d, outwardNormal);
             vec3 hitPoint = rec.pos + outwardNormal * 0.001;
 
             vec3 fuzzy_reflected_ray = normalize(R + randomInUnitSphere(gSeed) * rec.material.roughness);
@@ -302,10 +300,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
             
 
             //refraction calculation
-            vec3 T = VT / length(VT);
-            float cosT = sqrt(1.0 - senoT * senoT);
-
-            vec3 refractedRayDirection = T * senoT + outwardNormal * -cosT;
+            vec3 refractedRayDirection = refract(rIn.d, outwardNormal, niOverNt);
 
             vec3 fuzzy_refracted_ray = normalize(refractedRayDirection + randomInUnitSphere(gSeed) * rec.material.refractionRoughness);
             if(dot(fuzzy_refracted_ray, outwardNormal) < 0.0){
