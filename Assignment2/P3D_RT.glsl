@@ -12,7 +12,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
 {
     bool hit = false;
     rec.t = tmax;
-    float refractionRoughness = 0.05;
+    float refractionRoughness = 0.0;
    
     if(hit_triangle(createTriangle(vec3(-10.0, -0.01, 10.0), vec3(10.0, -0.01, 10.0), vec3(-10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
     {
@@ -61,7 +61,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
     }
 
 if(hit_sphere(
-        createSphere(vec3(0.0, 1.0, 0.0), -0.95),
+        createSphere(vec3(0.0, 1.0, 0.0), -0.80),
         r,
         tmin,
         rec.t,
@@ -189,18 +189,18 @@ vec3 directlighting(pointLight pl, Ray r, HitRecord rec){
 
             if(rec.material.type == MT_DIFFUSE)
             {
-                diffCol = pl.color * rec.material.albedo * max(dot(-r.d, rec.normal), 0.0) / pi * max(dot(rec.normal, L), 0.0);
-                specCol = pl.color * vec3(0.1, 0.1, 0.1) * pow(max(dot(H, rec.normal), 0.0), shininess);
+                diffCol = pl.color * rec.material.albedo / pi * max(dot(rec.normal, L), 0.0);
+                specCol = pl.color * vec3(0.1) * pow(max(dot(H, rec.normal), 0.0), 10.0);
             }
             if(rec.material.type == MT_METAL)
             {
-                diffCol = pl.color * vec3(0.1, 0.1, 0.1) * max(dot(rec.normal, L), 0.0);
-                specCol = pl.color * rec.material.albedo * pow(max(dot(H, rec.normal), 0.0), shininess);
+                diffCol = pl.color * vec3(0.0) * max(dot(rec.normal, L), 0.0);
+                specCol = pl.color * rec.material.albedo * pow(max(dot(H, rec.normal), 0.0), 200.0);
             }
             if(rec.material.type == MT_DIALECTRIC)
             {
-                diffCol = pl.color * vec3(0.1, 0.1, 0.1) * max(dot(rec.normal, L), 0.0);
-                specCol = pl.color * vec3(0.1, 0.1, 0.1) * pow(max(dot(H, rec.normal), 0.0), shininess);
+                diffCol = pl.color * vec3(0.0) * max(dot(rec.normal, L), 0.0);
+                specCol = pl.color * vec3(0.04) * pow(max(dot(H, rec.normal), 0.0), 500.0);
             }
 
             colorOut = diffCol + specCol;
